@@ -154,9 +154,9 @@ const ITEMS=[
   {key:'silk',jp:'シルクスライダー',en:'SILK SLIDER',used:'第40回 3番目',dist:7.5,
    spec:['吊るされた布をつかんで滑空','滑空距離12.2m','レールの高さ 約5.4m＊']},
   {key:'fish36',jp:'フィッシュボーン',en:'FISHBONE · 36',used:'第36回 4番目',dist:5.5,
-   spec:['直径30cmの足場4つ・間隔 約1.15m＊','太さ約26cm＊の赤いポール22本','回転軸の高さ 約2.8m＊・反時計回り']},
+   spec:['直径30cmの足場4つ・間隔 約1.16m＊','台から台まで 約4.1m＊','太さ約26cm＊の赤いポール22本']},
   {key:'fish40',jp:'フィッシュボーン',en:'FISHBONE · 40',used:'第40回 4番目',dist:5.5,
-   spec:['直径30cmの足場6つ・間隔 約1.15m＊','赤いポール22本＋逆回転の黄色9本','4つ目と5つ目の間はポールが来ない']},
+   spec:['直径30cmの足場6つ・間隔 約1.16m＊','台から台まで 約6.4m＊','赤22本＋逆回転の黄9本']},
   {key:'dragon',jp:'ドラゴングライダー',en:'DRAGON GLIDER',used:'第36回・第40回 5番目',dist:7.5,
    spec:['トランポリンから跳んでバーをつかむ','レール2本 各約6m＊','1本目のバーの高さ 約3.3m＊']},
   {key:'tackle',jp:'タックル',en:'TACKLE',used:'第36回・第40回 6番目',dist:4.5,
@@ -649,7 +649,8 @@ const BUILD={
 };
 // フィッシュボーン（第33回の実物写真から実測：足場 直径30cm・間隔約1.15m、回転軸 太さ約56cm・高さ約2.8m、
 // ポール 太さ約26cm・軸の中心から先端まで約1.85m・先端約55cmは銀）。ポールは太い軸から色々な角度に1本ずつ生えている
-const FB={FY:2.8,AR:.28,PR:.13,PL:1.85,TIP:.55,SP:1.15,D1:1.1,W:2*Math.PI/7.5};
+// 足場の間隔1.16m・最初と最後の足場は台の端から約0.3m（放送の真横の映像で足場の幅30cmを基準に実測）
+const FB={FY:2.8,AR:.28,PR:.13,PL:1.85,TIP:.55,SP:1.16,D1:.3,W:2*Math.PI/7.5};
 function spiralTex(base){const c=cnv(256),x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,256,256);noisy(x,c,.12,29);
   x.strokeStyle='#141418';x.lineWidth=14;for(const o of[-256,0,256]){x.beginPath();x.moveTo(o-20,276);x.lineTo(o+276,-20);x.stroke();}return tex(c,{srgb:true});}
 TX.axR=spiralTex('#d4232b');TX.axY=spiralTex('#f2c21a');
@@ -697,10 +698,11 @@ function fish(g,n,yellow){
   pool(g,-.2,dEnd+.2);
   deck(g,dEnd,dEnd+2.2,.7,2.6,M.vBlue);box(g,2.62,.012,.5,M.vRed,0,.705,dEnd+1.1);
   // 回転部：第36回は赤1本。第40回は赤（足場1〜4）と、逆回転の黄（足場5・6）。境目にはポールが来ない
-  const rA=ds[0]-.75,rB=yellow?ds[3]+.45:last+.75;
-  fishRotor(g,rA,rB,armSet(ds[0]-.35,ds[3]+(yellow?.1:.35),[4,4,3,4,3,4],.3),M.padRed,M.padSilver,M.axR,1,true,!yellow);
+  // 回転部の範囲も実測：赤は足場1の0.6m手前〜（第40回は足場4の0.25m先まで）、黄は足場5の0.1m手前〜足場6の0.7m先
+  const rA=ds[0]-.6,rB=yellow?ds[3]+.25:last+.6;
+  fishRotor(g,rA,rB,armSet(ds[0]-.3,ds[3]+(yellow?0:.3),[4,4,3,4,3,4],.3),M.padRed,M.padSilver,M.axR,1,true,!yellow);
   let yA,yB;
-  if(yellow){yA=ds[4]-.45;yB=last+.75;fishRotor(g,yA,yB,armSet(ds[4]-.1,last+.35,[3,3,3],1.1),M.padYellow,M.padRed,M.axY,-1,false,true);}
+  if(yellow){yA=ds[4]-.1;yB=last+.7;fishRotor(g,yA,yB,armSet(ds[4]+.05,last+.35,[3,3,3],1.1),M.padYellow,M.padRed,M.axY,-1,false,true);}
   // 骨組み：両端の門型＋上の枠（ポールの届く高さ 約4.65m より上）
   const H=5.3,f0=rA-.7,f1=(yellow?yB:rB)+.7,mids=yellow?[(rB+yA)/2]:[];
   frame(g,f0,f1,2.1,H,mids);
@@ -715,6 +717,7 @@ function fish(g,n,yellow){
   label(g,'太さ約26cm＊',new THREE.Vector3(0,FY+2.2,-(rA+rB)/2),yellow?'赤22本＋黄9本':'赤いポール22本',.85);
   if(yellow)label(g,'ポールが来ない',new THREE.Vector3(0,1.55,-(ds[3]+ds[4])/2),'4つ目と5つ目の間',.75);
   dim(g,[2.5,.2,-ds[0]],[2.5,.2,-last],`約${(last-ds[0]).toFixed(1)}m＊`,`足場${n}つの並び`);
+  dim(g,[2.5,1.15,0],[2.5,1.15,-dEnd],`約${dEnd.toFixed(1)}m＊`,'台から台まで');
   person(g,-2.95,-1);
 }
 // 固定部分を材質ごとに1つのメッシュにまとめる（描画を軽くする）
