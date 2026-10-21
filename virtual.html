@@ -154,9 +154,9 @@ const ITEMS=[
   {key:'silk',jp:'シルクスライダー',en:'SILK SLIDER',used:'第40回 3番目',dist:7.5,
    spec:['吊るされた布をつかんで滑空','滑空距離12.2m','レールの高さ 約5.4m＊']},
   {key:'fish36',jp:'フィッシュボーン',en:'FISHBONE · 36',used:'第36回 4番目',dist:5.5,
-   spec:['直径30cmの円柱の足場4つ','回転する赤いポール22本','回転軸の高さ 約3m＊']},
+   spec:['直径30cmの足場4つ・間隔 約1.15m＊','太さ約26cm＊の赤いポール22本','回転軸の高さ 約2.8m＊・反時計回り']},
   {key:'fish40',jp:'フィッシュボーン',en:'FISHBONE · 40',used:'第40回 4番目',dist:5.5,
-   spec:['直径30cmの円柱の足場6つ','赤いポール22本＋逆回転の黄色ポール9本','回転軸の高さ 約3m＊']},
+   spec:['直径30cmの足場6つ・間隔 約1.15m＊','赤いポール22本＋逆回転の黄色9本','4つ目と5つ目の間はポールが来ない']},
   {key:'dragon',jp:'ドラゴングライダー',en:'DRAGON GLIDER',used:'第36回・第40回 5番目',dist:7.5,
    spec:['トランポリンから跳んでバーをつかむ','レール2本 各約6m＊','1本目のバーの高さ 約3.3m＊']},
   {key:'tackle',jp:'タックル',en:'TACKLE',used:'第36回・第40回 6番目',dist:4.5,
@@ -647,28 +647,74 @@ const BUILD={
     person(g,-.4,-.6);
   }
 };
+// フィッシュボーン（第33回の実物写真から実測：足場 直径30cm・間隔約1.15m、回転軸 太さ約56cm・高さ約2.8m、
+// ポール 太さ約26cm・軸の中心から先端まで約1.85m・先端約55cmは銀）。ポールは太い軸から色々な角度に1本ずつ生えている
+const FB={FY:2.8,AR:.28,PR:.13,PL:1.85,TIP:.55,SP:1.15,D1:1.1,W:2*Math.PI/7.5};
+function spiralTex(base){const c=cnv(256),x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,256,256);noisy(x,c,.12,29);
+  x.strokeStyle='#141418';x.lineWidth=14;for(const o of[-256,0,256]){x.beginPath();x.moveTo(o-20,276);x.lineTo(o+276,-20);x.stroke();}return tex(c,{srgb:true});}
+TX.axR=spiralTex('#d4232b');TX.axY=spiralTex('#f2c21a');
+Object.assign(M,{
+  padSilver:S({color:0xaeb3b9,metalness:.55,roughness:.4,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.6,.6),envMapIntensity:.9}),
+  padRed:S({color:0xd4232b,roughness:.5,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.5,.5),envMapIntensity:.32}),
+  padYellow:S({color:0xf2c21a,roughness:.5,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.5,.5),envMapIntensity:.32}),
+  axR:S({map:TX.axR,roughness:.5,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.4,.4),envMapIntensity:.32}),
+  axY:S({map:TX.axY,roughness:.5,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.4,.4),envMapIntensity:.32})
+});
+// 回転部（軸＋ポール）を1つ作る。arms=[[軸方向の位置d, 角度], ...]
+function fishRotor(g,d0,d1,arms,body,tip,axMat,dir,capL,capR){
+  const r=D(new THREE.Group());r.position.set(0,FB.FY,0);g.add(r);
+  const L=d1-d0,ax=new THREE.Mesh(uvScale(new THREE.CylinderGeometry(FB.AR,FB.AR,L,28,1,true),1,L/1.3),axMat);ax.rotation.x=Math.PI/2;ax.position.z=-(d0+d1)/2;r.add(ax);
+  for(const [cap,d,s] of[[capL,d0,1],[capR,d1,-1]]){const e=new THREE.Mesh(cap?new THREE.ConeGeometry(FB.AR,.38,28):new THREE.CylinderGeometry(FB.AR,FB.AR,.02,28),axMat);e.rotation.x=s*Math.PI/2;e.position.z=-(d-(cap?.19:0)*s);r.add(e);}
+  const redL=FB.PL-FB.TIP-.2;
+  for(const [d,a] of arms){
+    const dx=-Math.sin(a),dy=Math.cos(a);
+    const put=(geo,from,len,mat)=>{const m=new THREE.Mesh(geo,mat);m.rotation.z=a;const c=from+len/2;m.position.set(dx*c,dy*c,-d);r.add(m);};
+    put(new THREE.CylinderGeometry(FB.PR,FB.PR,redL,18,1,true),.2,redL,body);
+    put(new THREE.CylinderGeometry(FB.PR+.006,FB.PR+.006,FB.TIP-.04,18,1,true),.2+redL,FB.TIP-.04,tip);
+    const cp=new THREE.Mesh(new THREE.SphereGeometry(FB.PR+.006,18,8,0,Math.PI*2,0,Math.PI/2),tip);cp.scale.y=.3;cp.rotation.z=a;cp.position.set(dx*(FB.PL-.04),dy*(FB.PL-.04),-d);r.add(cp);
+  }
+  bake(r);
+  anims.push((dt,t)=>r.rotation.z=dir*FB.W*t);
+  return r;
+}
+// ポールの並び：軸に沿って数か所にまとまり、まとまりごとに角度をずらす（第33回の写真の並び方を真似た推定）
+function armSet(d0,d1,counts,phase){
+  const out=[],n=counts.length;
+  counts.forEach((k,c)=>{const dc=lerp(d0,d1,n>1?c/(n-1):.5),a0=phase+c*2.35;
+    for(let j=0;j<k;j++)out.push([dc+(j-(k-1)/2)*.2,a0+j*2*Math.PI/k+(j%2?.25:-.15)]);});
+  return out;
+}
 function fish(g,n,yellow){
-  const FY=3.0,L=2.3,ds=[];
-  deck(g,-2.2,-.2,.62,2.6,M.vBlue);
-  for(let i=0;i<n;i++){const d=1.5+i*1.5,top=.42+(i%2?.16:0);const s=cyl(g,.15,top,M.gray,24);s.position.set(0,top/2,-d);const cp=cyl(g,.152,.03,M.rubber,24);cp.position.set(0,top+.0,-d);ds.push(d);}
-  const last=ds[ds.length-1],dA=.6,dB=last+.8;
-  pool(g,-.2,last+1.0);
-  deck(g,last+1.0,last+3.2,.62,2.6,M.vBlue);
-  const H=FY+.62,d0=dA-.7,d1=dB+.7;
-  frame(g,d0,d1,2.0,H,[(d0+d1)/2]);
-  tube(g,[0,FY,d0],[0,FY,d1],.08,M.steel,GCYL12);
-  for(const d of[d0,(d0+d1)/2,d1]){tube(g,[0,FY+.08,d],[0,H-.34,d],.06,M.steel,GCYL12);box(g,.3,.24,.2,M.dark,0,FY,d);}
-  box(g,.5,.42,.6,M.dark,0,H+.21,d1);
-  const mk=(d,ph,w,offs,mat)=>{const r=D(new THREE.Group());r.position.set(0,FY,-d);
-    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.14,20),M.steel);hub.rotation.x=Math.PI/2;r.add(hub);
-    for(const o of offs){const h=new THREE.Group();h.rotation.z=o;const c=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,L,12),mat);c.position.y=-L/2-.08;h.add(c);
-      const tip=new THREE.Mesh(new THREE.SphereGeometry(.052,12,8),M.rubber);tip.position.y=-L-.08;h.add(tip);r.add(h);}
-    g.add(r);anims.push((dt,t)=>r.rotation.z=ph+w*t);};
-  for(let i=0;i<11;i++)mk(lerp(dA+.2,dB-.2,i/10),i*.62,.35,[0,Math.PI],M.poleR);
-  for(let i=0;i<yellow;i++)mk(lerp(dA+.45,dB-.45,i/(yellow-1)),1.4+i*.9,-.35,[0],M.poleY);
-  dim(g,[-.15,.7,-1.5],[.15,.7,-1.5],'30cm','足場の直径',.7);
-  dim(g,[-2.45,0,-(dA+dB)/2],[-2.45,FY,-(dA+dB)/2],'約3m＊','回転軸の高さ');
-  dim(g,[2.45,.2,-1.5],[2.45,.2,-last],`約${(last-1.5).toFixed(1)}m`,`足場${n}つの並び`);
+  const {FY,SP,D1}=FB,ds=[],tops=n===4?[.5,.65,.48,.75]:[.5,.62,.5,.62,.52,.64];
+  deck(g,-2.2,0,.7,2.6,M.vBlue);box(g,2.62,.012,.5,M.vRed,0,.705,-1.1);
+  for(let i=0;i<n;i++){
+    const d=D1+i*SP,top=tops[i],lo=(yellow&&i>=4)?M.padYellow:M.padRed;ds.push(d);
+    const a=cyl(g,.15,top-.42,lo,28);a.position.set(0,(top-.42)/2,-d);
+    const b=cyl(g,.152,.4,M.padSilver,28);b.position.set(0,top-.2,-d);
+    const c=new THREE.Mesh(new THREE.SphereGeometry(.152,24,8,0,Math.PI*2,0,Math.PI/2),M.padSilver);c.scale.y=.13;c.position.set(0,top,-d);g.add(c);
+  }
+  const last=ds[n-1],dEnd=last+D1;
+  pool(g,-.2,dEnd+.2);
+  deck(g,dEnd,dEnd+2.2,.7,2.6,M.vBlue);box(g,2.62,.012,.5,M.vRed,0,.705,dEnd+1.1);
+  // 回転部：第36回は赤1本。第40回は赤（足場1〜4）と、逆回転の黄（足場5・6）。境目にはポールが来ない
+  const rA=ds[0]-.75,rB=yellow?ds[3]+.45:last+.75;
+  fishRotor(g,rA,rB,armSet(ds[0]-.35,ds[3]+(yellow?.1:.35),[4,4,3,4,3,4],.3),M.padRed,M.padSilver,M.axR,1,true,!yellow);
+  let yA,yB;
+  if(yellow){yA=ds[4]-.45;yB=last+.75;fishRotor(g,yA,yB,armSet(ds[4]-.1,last+.35,[3,3,3],1.1),M.padYellow,M.padRed,M.axY,-1,false,true);}
+  // 骨組み：両端の門型＋上の枠（ポールの届く高さ 約4.65m より上）
+  const H=5.3,f0=rA-.7,f1=(yellow?yB:rB)+.7,mids=yellow?[(rB+yA)/2]:[];
+  frame(g,f0,f1,2.1,H,mids);
+  // 軸受け：両端は円すいの先の外側に小さく、赤と黄の境目は2本の軸の間に
+  const eA=rA-.55,eB=(yellow?yB:rB)+.55;
+  for(const [d,c] of[[eA,rA-.38],[eB,(yellow?yB:rB)+.38]]){tube(g,[0,FY,c],[0,FY,d],.05,M.steel,GCYL12);box(g,.22,.26,.2,M.gray,0,FY,d);tube(g,[0,FY+.15,d],[0,H-.34,d],.06,M.steel,GCYL12);}
+  if(yellow){const d=(rB+yA)/2;box(g,.4,.44,.22,M.dark,0,FY,d);tube(g,[0,FY+.22,d],[0,H-.34,d],.07,M.steel,GCYL12);}
+  box(g,.6,.5,.7,M.dark,0,H+.25,f1);if(yellow)box(g,.6,.5,.7,M.dark,0,H+.25,(rB+yA)/2);
+  dim(g,[-.15,tops[0]+.3,-ds[0]],[.15,tops[0]+.3,-ds[0]],'30cm','足場の直径',.7);
+  dim(g,[-2.5,0,-(rA+rB)/2],[-2.5,FY,-(rA+rB)/2],'約2.8m＊','回転軸の高さ');
+  dim(g,[.9,FY,-(ds[1]+ds[2])/2],[.9,FY-FB.PL,-(ds[1]+ds[2])/2],'約1.85m＊','ポール（軸の中心から）',.75);
+  label(g,'太さ約26cm＊',new THREE.Vector3(0,FY+2.2,-(rA+rB)/2),yellow?'赤22本＋黄9本':'赤いポール22本',.85);
+  if(yellow)label(g,'ポールが来ない',new THREE.Vector3(0,1.55,-(ds[3]+ds[4])/2),'4つ目と5つ目の間',.75);
+  dim(g,[2.5,.2,-ds[0]],[2.5,.2,-last],`約${(last-ds[0]).toFixed(1)}m＊`,`足場${n}つの並び`);
   person(g,-2.95,-1);
 }
 // 固定部分を材質ごとに1つのメッシュにまとめる（描画を軽くする）
