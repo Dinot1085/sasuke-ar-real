@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>SASUKE 実寸AR リアル版 仮想背景版</title>
+<meta name="theme-color" content="#04070e">
+<link rel="icon" href="data:,">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Share+Tech+Mono&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: スマホ縦持ちが基準。左端に障害物の番号レール、残りは全面がカメラ＋3D。下に親指で届く操作バー */
+:root{
+  --bg:#04070e; --panel:rgba(6,12,28,.86); --line:rgba(150,175,230,.24);
+  --ink:#eef3ff; --muted:#9aa9c9; --accent:#ffcf2e; --go:#2fe08a;
+  --f-disp:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-num:"Share Tech Mono",ui-monospace,Menlo,monospace;
+  --rail:58px; --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px); --sl:env(safe-area-inset-left,0px);
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button{font:inherit;color:inherit;-webkit-appearance:none;appearance:none}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* 左の番号レール */
+#rail{position:fixed;left:0;top:0;bottom:0;width:calc(var(--rail) + var(--sl));padding:calc(var(--st) + 8px) 0 calc(var(--sb) + 8px) var(--sl);box-sizing:border-box;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:4;overflow-y:auto;scrollbar-width:none}
+#rail::-webkit-scrollbar{display:none}
+.rb{width:46px;min-height:46px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 0;cursor:pointer;flex:none}
+.rb b{font:400 15px/1 var(--f-num)}
+.rb span{font:700 9px/1.1 var(--f-body);color:var(--muted);text-align:center;max-width:44px;word-break:keep-all;overflow-wrap:anywhere}
+.rb[aria-current="true"]{background:var(--accent);border-color:var(--accent);color:#141000}
+.rb[aria-current="true"] span{color:#141000}
+#listBtn{background:transparent;border-color:transparent}
+#listBtn b{font:400 20px/1 var(--f-body)}
+
+/* 引き出しの一覧 */
+#drawer{position:fixed;left:0;top:0;bottom:0;width:min(86vw,320px);z-index:6;background:rgba(6,12,28,.97);border-right:1px solid var(--line);transform:translateX(-102%);transition:transform .22s;display:flex;flex-direction:column;padding:calc(var(--st) + 14px) 0 var(--sb) var(--sl);box-sizing:border-box}
+#drawer.open{transform:none}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:5}
+.dh{padding:0 16px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.dh small{display:block;font:400 11px/1.4 var(--f-num);letter-spacing:.28em;color:var(--accent)}
+.dh b{display:block;font:400 20px/1.2 var(--f-disp);margin-top:4px}
+.x{border:1px solid var(--line);background:transparent;border-radius:8px;width:40px;height:40px;font-size:20px}
+.dl{overflow:auto;padding:8px;display:flex;flex-direction:column;gap:4px;flex:1}
+.di{display:grid;grid-template-columns:30px 1fr;gap:2px 8px;text-align:left;background:transparent;border:1px solid transparent;border-radius:10px;padding:12px 10px;cursor:pointer}
+.di[aria-current="true"]{background:rgba(255,207,46,.12);border-color:rgba(255,207,46,.55)}
+.di .no{grid-row:span 2;font:400 16px/1.2 var(--f-num);color:var(--muted)}
+.di .nm{font-weight:700;font-size:16px}
+.di .tg{font-size:12px;color:var(--muted)}
+.df{padding:12px 16px;font-size:11px;line-height:1.6;color:var(--muted);border-top:1px solid var(--line)}
+.df a{color:var(--accent)}
+
+/* 情報カード */
+.card{position:fixed;top:calc(var(--st) + 10px);left:calc(var(--rail) + var(--sl) + 10px);right:10px;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;z-index:3;display:flex;flex-direction:column;gap:4px;cursor:pointer}
+.card .hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.card .en{font:400 10px/1 var(--f-num);color:var(--accent);letter-spacing:.2em}
+#status{font:700 10px/1 var(--f-body);color:var(--muted);white-space:nowrap}
+#status.on{color:var(--go)}
+.card h2{margin:0;font:400 19px/1.2 var(--f-disp)}
+.card ul{margin:2px 0 0;padding-left:1.1em;font-size:13px;line-height:1.55}
+.card .used{font-size:11px;color:var(--muted)}
+.card.min ul,.card.min .used{display:none}
+.card .tog{font-size:10px;color:var(--muted)}
+
+/* 下の操作バー */
+.bar{position:fixed;left:calc(var(--rail) + var(--sl) + 10px);right:10px;bottom:calc(var(--sb) + 10px);z-index:3;display:flex;flex-direction:column;gap:8px}
+.slider{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13px}
+.slider input{flex:1;min-width:0;height:28px;accent-color:var(--accent)}
+.slider output{font:400 17px/1 var(--f-num);color:var(--accent);min-width:3.4em;text-align:right;font-variant-numeric:tabular-nums}
+.btns{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px}
+.btn{min-height:50px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;padding:6px 8px}
+.btn.main{background:var(--accent);border-color:var(--accent);color:#141000}
+#hint{position:fixed;left:calc(50% + var(--rail)/2);top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;font-size:13px;line-height:1.5;color:var(--ink);background:rgba(0,0,0,.6);padding:8px 14px;border-radius:12px;transition:opacity .4s;text-align:center;max-width:calc(100vw - var(--rail) - 40px)}
+
+/* 開始画面 */
+#start{position:fixed;inset:0;z-index:10;background:radial-gradient(ellipse at 50% 0%,rgba(44,99,255,.3),transparent 60%),#04070e;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--st) + 24px) 22px calc(var(--sb) + 24px);box-sizing:border-box}
+#start .in{min-height:100%;display:flex;flex-direction:column;justify-content:center;gap:16px;max-width:460px;margin:0 auto}
+#start small{font:400 12px/1.4 var(--f-num);letter-spacing:.3em;color:var(--accent)}
+#start h1{margin:0;font:400 clamp(30px,9vw,46px)/1.1 var(--f-disp)}
+#start p{margin:0;color:var(--muted);line-height:1.7;font-size:14px;max-width:34em}
+#start ol{margin:0;padding-left:1.3em;line-height:1.8;font-size:14px}
+#start .btn{min-height:56px;font-size:16px;max-width:420px;width:100%}
+#start .note{font-size:12px}
+#start a.btn,.btns a.btn{display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;color:var(--ink)}
+#start .back{color:var(--muted);text-decoration:none;padding:8px 0}
+
+@media (orientation:landscape) and (max-height:500px){
+  .card ul{display:none}
+  .bar{flex-direction:row;align-items:stretch}
+  .slider{flex:1}
+  .btns{flex:1.3}
+}
+@media (min-width:900px){ :root{--rail:64px} .bar{max-width:640px;left:auto;right:16px} }
+@media (prefers-reduced-motion:reduce){#drawer{transition:none}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<video id="cam" playsinline muted autoplay hidden></video>
+<canvas id="gl"></canvas>
+
+<nav id="rail" aria-label="障害物"><button class="rb" id="listBtn" aria-label="障害物の一覧を開く"><b>≡</b><span>一覧</span></button></nav>
+<div id="scrim" hidden></div>
+<aside id="drawer" aria-label="障害物の一覧">
+  <div class="dh"><div><small>REALISTIC · AR</small><b>SASUKE 1st 実寸AR リアル版</b></div><button class="x" id="closeBtn" aria-label="閉じる">×</button></div>
+  <div class="dl" id="dlist"></div>
+  <div class="df">寸法は Wikipedia「<a href="https://ja.wikipedia.org/wiki/SASUKE" target="_blank" rel="noopener">SASUKE</a>」の各エリア解説より。＊は記載がなく推定した値。非公式のファン再現です。</div>
+</aside>
+
+<div class="card" id="card" role="button" aria-label="説明の表示を切り替える"></div>
+<div id="hint" style="opacity:0"></div>
+<div class="bar">
+  <div class="slider"><label for="dist">距離</label><input type="range" id="dist" min="1" max="20" step=".5" value="4"><output id="distO">4.0m</output></div>
+  <div class="btns">
+    <button class="btn" id="turn">90°回す</button>
+    <button class="btn" id="recenter">正面に置く</button>
+    <a class="btn" id="swap" href="./camera.html">カメラ版へ</a>
+  </div>
+</div>
+
+<div id="start"><div class="in">
+  <small>REALISTIC · AR · VIRTUAL</small>
+  <h1>SASUKE 1st<br>実寸AR<br>仮想背景版</h1>
+  <p>カメラを使わず、目盛り付きの地面の上に障害物を実物大で置きます。スマホを傾けると、その方向を見回せます。障害物を選ぶと、そのとき向いている方向の正面に置かれます。</p>
+  <ol>
+    <li>スマホを胸の高さに構える</li>
+    <li>下のボタンを押し、「動きと方向」を許可する（Androidは確認なし）</li>
+    <li>左の番号で障害物を選ぶ。距離はスライダーかピンチで変える</li>
+  </ol>
+  <button class="btn main" id="startAR">ジャイロで始める</button>
+  <button class="btn" id="startNo">指で見回す（ジャイロなし）</button>
+  <a class="note back" href="./">← 最初のページへ</a>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+(()=>{
+const $=s=>document.querySelector(s);
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+// ---------- 障害物データ ----------
+const ITEMS=[
+  {key:'quad',jp:'クワッドステップス',en:'QUAD STEPS',used:'第36回・第40回 1番目',dist:5.5,
+   spec:['斜めの足場4枚・幅90cm（黒い布張り）','内向きに約28°傾斜＊','4枚の並び 全長約7.4m＊']},
+  {key:'hill',jp:'ローリングヒル',en:'ROLLING HILL',used:'第36回・第40回 2番目',dist:5.5,
+   spec:['回転ローラー 上り5本＋下り5本','ローラー直径50cm','頂上の高さ 約2.3m＊・全長約6.6m＊']},
+  {key:'wing',jp:'ウイングスライダー',en:'WING SLIDER',used:'第36回 3番目',dist:6.5,
+   spec:['左右2枚のアクリル板に手足を突っ張ってレールを下る','下り段差30cm×2か所','レール全長 約10.3m＊・板 約2.5×1.2m＊']},
+  {key:'silk',jp:'シルクスライダー',en:'SILK SLIDER',used:'第40回 3番目',dist:7.5,
+   spec:['吊るされた布をつかんで滑空','滑空距離12.2m','レールの高さ 約5.4m＊']},
+  {key:'fish36',jp:'フィッシュボーン',en:'FISHBONE · 36',used:'第36回 4番目',dist:5.5,
+   spec:['直径30cmの円柱の足場4つ','回転する赤いポール22本','回転軸の高さ 約3m＊']},
+  {key:'fish40',jp:'フィッシュボーン',en:'FISHBONE · 40',used:'第40回 4番目',dist:5.5,
+   spec:['直径30cmの円柱の足場6つ','赤いポール22本＋逆回転の黄色ポール9本','回転軸の高さ 約3m＊']},
+  {key:'dragon',jp:'ドラゴングライダー',en:'DRAGON GLIDER',used:'第36回・第40回 5番目',dist:7.5,
+   spec:['トランポリンから跳んでバーをつかむ','レール2本 各約6m＊','1本目のバーの高さ 約3.3m＊']},
+  {key:'tackle',jp:'タックル',en:'TACKLE',used:'第36回・第40回 6番目',dist:4.5,
+   spec:['壁3枚 240kg・300kg・320kg（計860kg）','押して進む距離12m','壁の大きさ 約2.3×1.9m＊']},
+  {key:'wall',jp:'そり立つ壁',en:'WARPED WALL',used:'第36回 7番目（最終）',dist:7,
+   spec:['高さ4.5m','湾曲した壁を駆け上がる']},
+  {key:'wall2',jp:'2連そり立つ壁',en:'DOUBLE WARPED WALL',used:'第40回 7番目（最終）',dist:7,
+   spec:['1つ目 高さ4.2m','2つ目 高さ4.5m','2つの壁は一直線上、間はマットの段差']}
+];
+
+
+// ---------- three.js ----------
+// 色の指定(0xRRGGBB)を sRGB として扱う（r149 の既定はリニア扱いで、赤がピンクに褪せる）
+if(THREE.ColorManagement)THREE.ColorManagement.legacyMode=false;
+const canvas=$('#gl');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
+renderer.setClearColor(0x000000,0);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+// 太陽の向き：右上やや手前。影が左へ落ちて、正面から見ても影が見える
+const SUNDIR=new THREE.Vector3(.65,.72,.22).normalize();
+const ANISO=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0xc4d3e2,70,240);
+const camera=new THREE.PerspectiveCamera(62,1,.05,400);
+camera.rotation.order='YXZ';
+
+// ---------- 手続き生成のテクスチャ（画像ファイルを使わない） ----------
+function cnv(w,h=w){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function R0(a){return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+// 継ぎ目なく繰り返せる値ノイズを1層重ねる（端の列を先頭と同じにして拡大する）
+function octave(g,N,cells,alpha,seed){
+  const s=cnv(cells+1),sg=s.getContext('2d'),id=sg.createImageData(cells+1,cells+1),r=R0(seed),v=[];
+  for(let i=0;i<cells*cells;i++)v.push(r()*255);
+  for(let y=0;y<=cells;y++)for(let x=0;x<=cells;x++){const k=(y*(cells+1)+x)*4,q=v[(y%cells)*cells+(x%cells)];id.data[k]=id.data[k+1]=id.data[k+2]=q;id.data[k+3]=255;}
+  sg.putImageData(id,0,0);const k=N/cells;
+  g.save();g.globalAlpha=alpha;g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(s,-k/2,-k/2,k*(cells+1),k*(cells+1));g.restore();
+}
+function fbm(N,seed,oct=[[4,1],[8,.5],[16,.32],[32,.22],[64,.16]]){const c=cnv(N),g=c.getContext('2d');oct.forEach(([cl,a],i)=>octave(g,N,cl,a,seed*31+i));return c;}
+// 濃淡を lo..hi に引き伸ばし、色味 tint を掛ける
+function levels(c,lo,hi,tint=[1,1,1]){
+  const w=c.width,h=c.height,d=c.getContext('2d').getImageData(0,0,w,h).data;let mn=255,mx=0;
+  for(let i=0;i<d.length;i+=4){mn=Math.min(mn,d[i]);mx=Math.max(mx,d[i]);}
+  const o=cnv(w,h),og=o.getContext('2d'),od=og.createImageData(w,h),sc=(hi-lo)/Math.max(1,mx-mn);
+  for(let i=0;i<d.length;i+=4){const v=lo+(d[i]-mn)*sc;od.data[i]=v*tint[0];od.data[i+1]=v*tint[1];od.data[i+2]=v*tint[2];od.data[i+3]=255;}
+  og.putImageData(od,0,0);return o;
+}
+function toNormal(c,str){
+  const N=c.width,H=c.height,src=c.getContext('2d').getImageData(0,0,N,H).data,o=cnv(N,H),og=o.getContext('2d'),od=og.createImageData(N,H);
+  const h=(x,y)=>src[(((y+H)%H)*N+((x+N)%N))*4]/255;
+  for(let y=0;y<H;y++)for(let x=0;x<N;x++){const dx=(h(x+1,y)-h(x-1,y))*str,dy=(h(x,y+1)-h(x,y-1))*str,l=Math.hypot(dx,dy,1),k=(y*N+x)*4;
+    od.data[k]=(-dx/l*.5+.5)*255;od.data[k+1]=(dy/l*.5+.5)*255;od.data[k+2]=(1/l*.5+.5)*255;od.data[k+3]=255;}
+  og.putImageData(od,0,0);return o;
+}
+function tex(c,{srgb=false,rep=[1,1]}={}){const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(...rep);t.anisotropy=ANISO;if(srgb)t.encoding=THREE.sRGBEncoding;return t;}
+function noisy(x,c,a=.18,seed=1){x.save();x.globalAlpha=a;x.globalCompositeOperation='multiply';x.drawImage(levels(fbm(c.width,seed),150,255),0,0,c.width,c.height);x.restore();}
+
+const TX={};
+TX.grime=tex(levels(fbm(256,11),200,255),{srgb:true});
+TX.rough=tex(levels(fbm(256,23),120,235));
+{ // ヘアライン（アルミ・レール）
+  const c=cnv(256),x=c.getContext('2d'),r=R0(5);x.fillStyle='#b4b4b4';x.fillRect(0,0,256,256);
+  for(let i=0;i<1100;i++){const y=r()*256,v=120+r()*120|0;x.strokeStyle=`rgba(${v},${v},${v},.35)`;x.lineWidth=.6+r()*1.2;x.beginPath();x.moveTo(-10,y);x.lineTo(266,y+(r()-.5)*2);x.stroke();}
+  TX.brush=tex(c);
+}
+TX.conc=tex(levels(fbm(256,31,[[8,1],[32,.5],[128,.45]]),150,206,[1,.99,.96]),{srgb:true});
+TX.vinylN=tex(toNormal(fbm(256,41,[[8,1],[32,.45],[128,.3]]),2.2),{rep:[2,2]});
+{ // 布の織り目
+  const c=cnv(64),x=c.getContext('2d'),id=x.createImageData(64,64);
+  for(let y=0;y<64;y++)for(let i=0;i<64;i++){const a=((i>>2)+(y>>2))%2,v=a?Math.sin((i%4+.5)/4*Math.PI):Math.sin((y%4+.5)/4*Math.PI),k=(y*64+i)*4;id.data[k]=id.data[k+1]=id.data[k+2]=v*255;id.data[k+3]=255;}
+  x.putImageData(id,0,0);TX.weaveN=tex(toNormal(c,1.6),{rep:[6,6]});
+}
+TX.waterN=tex(toNormal(fbm(256,51,[[4,1],[8,.7],[16,.5],[32,.35]]),5));
+TX.gravel=tex((()=>{const c=levels(fbm(256,71,[[16,1],[64,.6],[128,.5]]),88,150,[1,.95,.84]),x=c.getContext('2d'),r=R0(9);
+  for(let i=0;i<1600;i++){const v=110+r()*110|0;x.fillStyle=`rgba(${v},${v*.96|0},${v*.9|0},.7)`;x.fillRect(r()*256,r()*256,1+r()*2,1+r()*2);}return c;})(),{srgb:true,rep:[90,90]});
+{ // そり立つ壁の面：銀灰色のパネル、継ぎ目、ボルト、靴のこすれ跡
+  const c=levels(fbm(512,61),184,214,[.99,1,1.02]),x=c.getContext('2d'),r=R0(7);
+  for(let i=0;i<520;i++){const u=.5+(r()+r()+r()-1.5)*.36,v=.4+(r()+r()-1)*.3;x.save();x.translate(u*512,(1-v)*512);x.rotate((r()-.5)*.5);x.fillStyle=`rgba(25,25,28,${.03+r()*.09})`;x.beginPath();x.ellipse(0,0,4+r()*9,1+r()*2,0,0,Math.PI*2);x.fill();x.restore();}
+  x.strokeStyle='rgba(70,74,80,.85)';x.lineWidth=3;
+  for(let i=1;i<6;i++){x.beginPath();x.moveTo(0,i*512/6);x.lineTo(512,i*512/6);x.stroke();}
+  for(const u of[1/3,2/3]){x.beginPath();x.moveTo(u*512,0);x.lineTo(u*512,512);x.stroke();}
+  x.fillStyle='rgba(230,232,236,.95)';for(let i=1;i<6;i++)for(let k=8;k<512;k+=32){x.beginPath();x.arc(k,i*512/6-6,1.8,0,7);x.fill();}
+  TX.wall=tex(c,{srgb:true});
+}
+const HAZ=(()=>{const c=cnv(128),x=c.getContext('2d');x.fillStyle='#f2c014';x.fillRect(0,0,128,128);x.fillStyle='#17171a';
+  for(let i=-5;i<5;i++){x.beginPath();x.moveTo(i*32,128);x.lineTo(i*32+16,128);x.lineTo(i*32+144,0);x.lineTo(i*32+128,0);x.fill();}return c;})();
+TX.hazard=tex(HAZ,{srgb:true});
+{ // タックルの壁の正面：上に警告色、黄色の帯と×印
+  const c=cnv(256,212),x=c.getContext('2d');x.fillStyle='#d7dade';x.fillRect(0,0,256,212);noisy(x,c,.12,3);
+  x.save();x.scale(.35,.35);x.fillStyle=x.createPattern(HAZ,'repeat');x.fillRect(0,0,256/.35,30/.35);x.restore();
+  x.strokeStyle='#a0a6ad';x.lineWidth=11;x.beginPath();x.moveTo(58,86);x.lineTo(198,170);x.moveTo(198,86);x.lineTo(58,170);x.stroke();
+  x.fillStyle='#f2c014';x.fillRect(44,66,168,14);x.fillRect(44,176,168,14);
+  x.strokeStyle='rgba(90,96,104,.7)';x.lineWidth=3;x.strokeRect(10,40,236,166);
+  TX.tackle=tex(c,{srgb:true});
+}
+{ // 側面のシート：鉄骨の×模様
+  const c=cnv(256),x=c.getContext('2d');x.fillStyle='#c4c9cf';x.fillRect(0,0,256,256);noisy(x,c,.4,13);
+  x.strokeStyle='#8e959e';x.lineWidth=7;x.strokeRect(4,4,248,248);x.beginPath();x.moveTo(8,8);x.lineTo(248,248);x.moveTo(248,8);x.lineTo(8,248);x.stroke();
+  TX.sheet=tex(c,{srgb:true,rep:[1/1.5,1/1.5]});
+}
+{ // 台の側面：縦のスリット
+  const c=cnv(128,64),x=c.getContext('2d');x.fillStyle='#a3a9b0';x.fillRect(0,0,128,64);noisy(x,c,.4,17);
+  x.fillStyle='rgba(60,64,70,.55)';for(let i=4;i<128;i+=16)x.fillRect(i,8,4,48);x.fillStyle='rgba(60,64,70,.6)';x.fillRect(0,0,128,3);
+  TX.skirt=tex(c,{srgb:true});
+}
+{ // ローラー：赤いビニール、回転が分かるよう縦の継ぎ目
+  const c=cnv(256,64),x=c.getContext('2d');x.fillStyle='#d02a2f';x.fillRect(0,0,256,64);noisy(x,c,.3,19);
+  for(let i=0;i<6;i++){x.fillStyle='rgba(70,0,0,.55)';x.fillRect(i*256/6,0,3,64);x.fillStyle='rgba(255,190,190,.25)';x.fillRect(i*256/6+3,0,2,64);}
+  TX.roller=tex(c,{srgb:true});
+}
+function bands(a,b){const c=cnv(16,256),x=c.getContext('2d');for(let i=0;i<8;i++){x.fillStyle=i%2?b:a;x.fillRect(0,i*32,16,32);}return tex(c,{srgb:true});}
+TX.poleR=bands('#d8232a','#f1f1ef');TX.poleY=bands('#f4c21c','#f1f1ef');
+{ // 遠景の木立
+  const c=cnv(1024,256),x=c.getContext('2d'),r=R0(21);
+  for(let i=0;i<260;i++){const px=r()*1024,h=60+r()*120,w=20+r()*36,gcol=40+r()*30|0;x.fillStyle=`rgb(${gcol*.55|0},${gcol},${gcol*.5|0})`;
+    for(const o of[-1024,0,1024]){x.beginPath();x.ellipse(px+o,256-h*.55,w,h*.55,0,0,7);x.fill();}}
+  x.fillStyle='rgb(30,48,26)';x.fillRect(0,236,1024,20);
+  TX.trees=tex(c,{srgb:true,rep:[5,1]});TX.trees.wrapT=THREE.ClampToEdgeWrapping;
+}
+
+// ---------- 材質（PBR） ----------
+const S=o=>new THREE.MeshStandardMaterial(o);
+const M={
+  alu:S({color:0xe8ebee,map:TX.grime,metalness:.7,roughness:.42,roughnessMap:TX.brush}),
+  paint:S({color:0xeef0f2,map:TX.grime,metalness:.05,roughness:.62,roughnessMap:TX.rough}),
+  steel:S({color:0xc9ced4,metalness:.92,roughness:.3,roughnessMap:TX.brush}),
+  gray:S({color:0x8f969e,map:TX.grime,metalness:.35,roughness:.55}),
+  dark:S({color:0x2e3239,metalness:.45,roughness:.5,roughnessMap:TX.rough}),
+  conc:S({map:TX.conc,roughness:.95}),
+  water:S({color:0x4a4628,metalness:0,roughness:.16,normalMap:TX.waterN,normalScale:new THREE.Vector2(.3,.3),envMapIntensity:.55}),
+  rim:S({color:0xd49a46,map:TX.grime,roughness:.55,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.4,.4)}),
+  vBlue:S({color:0x1d5fd4,roughness:.6,roughnessMap:TX.rough,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.5,.5)}),
+  vRed:S({color:0xd1232b,roughness:.58,roughnessMap:TX.rough,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.5,.5)}),
+  cloth:S({color:0x1a1a1d,roughness:1,normalMap:TX.weaveN}),
+  clothRed:S({color:0xc81f29,roughness:.95,normalMap:TX.weaveN,side:THREE.DoubleSide}),
+  rubber:S({color:0x19191b,roughness:.95,normalMap:TX.vinylN}),
+  deck:S({color:0x80868d,map:TX.grime,roughness:.85,normalMap:TX.vinylN}),
+  skirt:S({map:TX.skirt,metalness:.3,roughness:.6}),
+  roller:S({map:TX.roller,roughness:.5,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.3,.3)}),
+  acrylic:S({color:0xe4f4ff,transparent:true,opacity:.3,roughness:.06,metalness:0,envMapIntensity:2.2,side:THREE.DoubleSide,depthWrite:false}),
+  wall:S({map:TX.wall,metalness:.12,roughness:.55,roughnessMap:TX.rough,side:THREE.DoubleSide}),
+  sheet:S({map:TX.sheet,metalness:.25,roughness:.6}),
+  poleR:S({map:TX.poleR,roughness:.4}),poleY:S({map:TX.poleY,roughness:.4}),
+  hazard:S({map:TX.hazard,roughness:.6}),
+  tackleFace:S({map:TX.tackle,roughness:.7,normalMap:TX.vinylN,normalScale:new THREE.Vector2(.4,.4)}),
+  tackleSide:S({color:0xc9cdd2,map:TX.grime,roughness:.65,metalness:.15}),
+  mann:S({color:0xd8dce2,roughness:.62}),
+  ledB:new THREE.MeshBasicMaterial({color:0x5fc8ff,toneMapped:false}),
+  ledR:new THREE.MeshBasicMaterial({color:0xff4050,toneMapped:false}),
+  dim:new THREE.LineBasicMaterial({color:0xffcf2e,depthTest:false,transparent:true})
+};
+// 空からの環境光は金属の映り込み用。塗装やビニールには弱めに効かせ、太陽の影が見えるようにする
+for(const k in M){const m=M[k];if(m.isMeshStandardMaterial&&m.metalness<.5&&k!=='acrylic'&&k!=='water')m.envMapIntensity=.32;}
+
+// ---------- 空・光・映り込み ----------
+function skyMat(lin){return new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{sd:{value:SUNDIR},lin:{value:lin?1:0}},
+  vertexShader:'varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:`varying vec3 p;uniform vec3 sd;uniform float lin;void main(){vec3 d=normalize(p);float h=d.y;
+    vec3 zen=vec3(.28,.5,.86),hor=vec3(.77,.83,.89),gnd=vec3(.33,.33,.27);
+    vec3 c=h>0.?mix(hor,zen,pow(h,.55)):mix(hor*.85,gnd,clamp(-h*5.,0.,1.));
+    float s=max(dot(d,sd),0.);c+=vec3(1.,.95,.85)*(pow(s,900.)*(lin>.5?20.:6.)+pow(s,10.)*.22);
+    gl_FragColor=vec4(lin>.5?pow(c,vec3(2.2)):c,1.);}`});}
+{
+  const es=new THREE.Scene();es.add(new THREE.Mesh(new THREE.SphereGeometry(50,32,16),skyMat(true)));
+  const gnd=new THREE.Mesh(new THREE.CircleGeometry(40,24),new THREE.MeshBasicMaterial({color:0x3a3a30}));gnd.rotation.x=-Math.PI/2;gnd.position.y=-2;es.add(gnd);
+  const pm=new THREE.PMREMGenerator(renderer);scene.environment=pm.fromScene(es,.03).texture;pm.dispose();
+}
+scene.add(new THREE.HemisphereLight(0xdde8ff,0x5d5a48,.42));
+const sun=new THREE.DirectionalLight(0xfff2de,2.1);
+sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0004;sun.shadow.normalBias=.03;
+const catcherMat=new THREE.ShadowMaterial({opacity:.42});
+let catcher=null;
+
+// 仮想背景（カメラが使えないとき）：昼の空、砂利の地面、目盛り、遠くの木立
+const env=new THREE.Group();scene.add(env);
+{
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(150,32,16),skyMat(false)));
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(300,300),S({map:TX.gravel,roughness:1,color:0xb8b2a6,envMapIntensity:.3}));g.rotation.x=-Math.PI/2;g.position.y=-.01;g.receiveShadow=true;env.add(g);
+  const grid=new THREE.GridHelper(80,80,0x3d4652,0x5d6670);grid.material.transparent=true;grid.material.opacity=.4;grid.position.y=.001;env.add(grid);
+  const t=new THREE.Mesh(new THREE.CylinderGeometry(140,140,26,64,1,true),new THREE.MeshBasicMaterial({map:TX.trees,transparent:true,alphaTest:.5,side:THREE.BackSide}));t.position.y=11;env.add(t);
+}
+
+// ---------- 形を作る道具（座標は [x, 高さ, 奥行き d]、奥行きは手前0から奥へ +） ----------
+const V=(x,y,d)=>new THREE.Vector3(x,y,-d);
+const UP=new THREE.Vector3(0,1,0);
+const GCYL=new THREE.CylinderGeometry(1,1,1,6,1,true),GCYL12=new THREE.CylinderGeometry(1,1,1,14,1,false),GBOX=new THREE.BoxGeometry(1,1,1);
+const lerp3=(a,b,t)=>a.clone().lerp(b,t);
+const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+function rodV(p,A,B,r,mat,geo=GCYL){const dir=B.clone().sub(A),L=dir.length();const m=new THREE.Mesh(geo,mat);m.scale.set(r,L,r);m.position.copy(A).add(B).multiplyScalar(.5);m.quaternion.setFromUnitVectors(UP,dir.divideScalar(L));p.add(m);return m;}
+const tube=(p,a,b,r,mat,geo)=>rodV(p,V(...a),V(...b),r,mat,geo);
+function beam(p,a,b,w,h,mat){const A=V(...a),B=V(...b);const m=new THREE.Mesh(GBOX,mat);m.scale.set(w,h,A.distanceTo(B));m.position.copy(A).add(B).multiplyScalar(.5);m.lookAt(B);p.add(m);return m;}
+function box(p,w,h,l,mat,x,y,d){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,l),mat);m.position.set(x,y,-d);p.add(m);return m;}
+function cyl(p,r,h,mat,seg=18){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg),mat);p.add(m);return m;}
+const D=o=>{o.userData.dyn=true;return o;};
+// 角の丸い箱（マット・クッション）
+const RBC={};
+function rboxGeo(w,h,l,r){
+  const key=[w,h,l,r].map(v=>v.toFixed(3)).join();if(RBC[key])return RBC[key];
+  r=Math.min(r,w*.45,h*.45,l*.45);const a=w/2-r,b=h/2-r,q=Math.max(.003,Math.min(r,a,b)*.9),s=new THREE.Shape();
+  s.moveTo(-a+q,-b);s.lineTo(a-q,-b);s.absarc(a-q,-b+q,q,-Math.PI/2,0);s.lineTo(a,b-q);s.absarc(a-q,b-q,q,0,Math.PI/2);s.lineTo(-a+q,b);s.absarc(-a+q,b-q,q,Math.PI/2,Math.PI);s.lineTo(-a,-b+q);s.absarc(-a+q,-b+q,q,Math.PI,Math.PI*1.5);
+  const g=new THREE.ExtrudeGeometry(s,{depth:Math.max(.001,l-2*r),bevelEnabled:true,bevelThickness:r,bevelSize:r,bevelSegments:3,curveSegments:3});
+  g.center();return RBC[key]=g;
+}
+function rbox(p,w,h,l,r,mat,x,y,d){const m=new THREE.Mesh(rboxGeo(w,h,l,r),mat);m.position.set(x,y,-d);p.add(m);return m;}
+// 子グループの中身を、変形を焼き込んで親へ移す（あとで1つにまとめられるように）
+function flatten(g,s){s.updateMatrix();for(const c of[...s.children]){c.updateMatrix();c.applyMatrix4(s.matrix);g.add(c);}}
+function uvScale(geo,su,sv){const uv=geo.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*su,uv.getY(i)*sv);return geo;}
+// 白いアルミの角トラス：4本の主材＋各面のジグザグ斜材
+function truss(p,a,b,s=.34,mat=M.alu){
+  const A=V(...a),B=V(...b),u=B.clone().sub(A),L=u.length();u.normalize();
+  const t=Math.abs(u.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+  const v=new THREE.Vector3().crossVectors(u,t).normalize(),w=new THREE.Vector3().crossVectors(u,v).normalize(),h=s/2;
+  const C=[[1,1],[1,-1],[-1,-1],[-1,1]].map(([i,j])=>v.clone().multiplyScalar(i*h).add(w.clone().multiplyScalar(j*h)));
+  for(const c of C)rodV(p,A.clone().add(c),B.clone().add(c),.026,mat);
+  const n=Math.max(1,Math.round(L/s)),st=L/n;
+  for(let f=0;f<4;f++){const c1=C[f],c2=C[(f+1)%4];
+    for(let i=0;i<n;i++){const p0=A.clone().addScaledVector(u,i*st),p1=A.clone().addScaledVector(u,(i+1)*st),[x,y]=i%2?[c1,c2]:[c2,c1];rodV(p,p0.add(x),p1.add(y),.012,mat);}}
+  for(const P of[A,B])for(let f=0;f<4;f++)rodV(p,P.clone().add(C[f]),P.clone().add(C[(f+1)%4]),.016,mat);
+}
+// コンクリートの土台に立つトラス柱
+function column(p,x,d,H,s=.34){box(p,.72,.42,.72,M.conc,x,.21,d);truss(p,[x,.42,d],[x,H,d],s);}
+// 門型の骨組み：四隅の柱、両側の上弦、横つなぎ
+function frame(p,d0,d1,hw,H,cross=[],s=.34){
+  for(const d of[d0,d1])for(const sx of[-1,1])column(p,sx*hw,d,H,s);
+  for(const sx of[-1,1])truss(p,[sx*hw,H-s/2,d0],[sx*hw,H-s/2,d1],s);
+  for(const d of[d0,d1,...cross])truss(p,[-hw,H-s/2,d],[hw,H-s/2,d],s);
+}
+// 水を張ったプール（縁は高さ27cm）
+function pool(p,d0,d1,hw=2.3,lvl=.15){
+  const L=d1-d0,c=(d0+d1)/2,wg=uvScale(new THREE.PlaneGeometry(hw*2,L),hw,L/2);
+  const w=new THREE.Mesh(wg,M.water);w.rotation.x=-Math.PI/2;w.position.set(0,lvl,-c);w.userData.noCast=true;p.add(w);
+  for(const sx of[-1,1])rbox(p,.22,lvl+.12,L+.44,.04,M.rim,sx*(hw+.11),(lvl+.12)/2,c);
+  for(const dd of[d0-.11,d1+.11])rbox(p,hw*2,lvl+.12,.22,.04,M.rim,0,(lvl+.12)/2,dd);
+}
+// 足場・着地台：白い台の上にビニールのマット（上面が高さ y）
+function deck(p,d0,d1,y=.62,w=2.6,mat=M.vBlue){
+  const L=d1-d0,c=(d0+d1)/2;
+  if(y>.3)box(p,w-.14,y-.2,L-.14,M.paint,0,(y-.2)/2,c);
+  rbox(p,w,.22,L,.06,mat,0,y-.11,c);
+}
+// 灰色の金属の台（タックル・壁の走路）
+function gdeck(p,d0,d1,y,w){
+  const L=d1-d0,c=(d0+d1)/2;box(p,w,y-.02,L,M.gray,0,(y-.02)/2,c);box(p,w,.02,L,M.deck,0,y-.01,c);
+  for(const sx of[-1,1]){const m=new THREE.Mesh(uvScale(new THREE.PlaneGeometry(L,y),L/.9,1),M.skirt);m.rotation.y=sx*Math.PI/2;m.position.set(sx*(w/2+.004),y/2,-c);p.add(m);}
+  const f=new THREE.Mesh(uvScale(new THREE.PlaneGeometry(w,y),w/.9,1),M.skirt);f.position.set(0,y/2,-d0+.004);p.add(f);
+}
+// 横から見た輪郭を厚み th で押し出した板（ローリングヒルの側板など）
+function sideBoard(p,pts,x,th,mat){const s=new THREE.Shape(pts.map(([d,y])=>new THREE.Vector2(d,y)));const m=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:th,bevelEnabled:false}),mat);m.rotation.y=Math.PI/2;m.position.set(x,0,0);p.add(m);return m;}
+// 角の丸い多角形
+function roundPoly(pts,r){const s=new THREE.Shape(),n=pts.length;
+  for(let i=0;i<n;i++){const P=pts[i],A=pts[(i+n-1)%n],B=pts[(i+1)%n];const da=new THREE.Vector2(P[0]-A[0],P[1]-A[1]).normalize(),db=new THREE.Vector2(B[0]-P[0],B[1]-P[1]).normalize();
+    const s0=[P[0]-da.x*r,P[1]-da.y*r],s1=[P[0]+db.x*r,P[1]+db.y*r];i?s.lineTo(...s0):s.moveTo(...s0);s.quadraticCurveTo(P[0],P[1],...s1);}
+  return s;}
+
+const labelCache={};
+function labelTex(text,sub){
+  const c=document.createElement('canvas');c.width=512;c.height=sub?190:128;const g=c.getContext('2d');
+  g.fillStyle='rgba(8,12,24,.88)';const r=24;g.beginPath();g.roundRect?g.roundRect(4,4,504,c.height-8,r):g.rect(4,4,504,c.height-8);g.fill();
+  g.strokeStyle='#ffcf2e';g.lineWidth=5;g.stroke();
+  g.fillStyle='#ffcf2e';g.textAlign='center';g.textBaseline='middle';
+  let fs=70;g.font=`400 ${fs}px "Dela Gothic One","Hiragino Sans",sans-serif`;
+  while(g.measureText(text).width>470&&fs>24){fs-=4;g.font=`400 ${fs}px "Dela Gothic One","Hiragino Sans",sans-serif`;}
+  g.fillText(text,256,sub?72:66);
+  if(sub){g.fillStyle='#eef3ff';g.font='700 40px "Zen Kaku Gothic New","Hiragino Sans",sans-serif';g.fillText(sub,256,142);}
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return {t,aspect:512/c.height};
+}
+function label(parent,text,pos,sub,size=.9){
+  const {t,aspect}=labelTex(text,sub);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true,toneMapped:false}));
+  s.scale.set(size,size/aspect,1);s.position.copy(pos);s.renderOrder=10;parent.add(s);return s;
+}
+// 寸法線：両端に目盛り、中央にラベル
+function dim(parent,a,b,text,sub,size){
+  const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b);
+  const dir=B.clone().sub(A).normalize(),up=Math.abs(dir.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0);
+  const tick=new THREE.Vector3().crossVectors(dir,up).normalize().multiplyScalar(.12);
+  if(tick.lengthSq()<1e-6)tick.set(0,.12,0);
+  const pts=[A,B,A.clone().add(tick),A.clone().sub(tick),B.clone().add(tick),B.clone().sub(tick)];
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  const l=new THREE.LineSegments(g,M.dim);l.renderOrder=9;parent.add(l);
+  label(parent,text,A.clone().add(B).multiplyScalar(.5).add(new THREE.Vector3(0,.28,0)),sub,size);
+}
+// 比較用の人（身長175cm のマネキン）
+function person(p,x,d){
+  const g=new THREE.Group();g.position.set(x,0,-d);
+  const add=(geo,px,py,pz=0,rz=0,sx=1,sz=1)=>{const o=new THREE.Mesh(geo,M.mann);o.position.set(px,py,pz);o.rotation.z=rz;o.scale.set(sx,1,sz);g.add(o);return o;};
+  const cap=(r,l)=>new THREE.CapsuleGeometry(r,l,4,12);
+  for(const s of[-1,1]){
+    add(cap(.062,.36),s*.1,.27);add(cap(.078,.34),s*.1,.71);
+    const sh=new THREE.Mesh(rboxGeo(.11,.07,.27,.03),M.dark);sh.position.set(s*.1,.035,.05);g.add(sh);
+    add(cap(.048,.25),s*.235,1.3,0,s*.1);add(cap(.04,.23),s*.262,.99,0,s*.04);
+    add(new THREE.SphereGeometry(.048,12,10),s*.272,.81);
+  }
+  add(cap(.13,.12),0,.97,0,Math.PI/2,1,.8);
+  add(cap(.15,.3),0,1.24,0,0,1.22,.72);
+  add(cap(.05,.06),0,1.52);
+  add(new THREE.SphereGeometry(.1,20,16),0,1.645).scale.set(.95,1.13,1.05);
+  label(g,'175cm',new THREE.Vector3(0,2.05,0),'比較用の人',.6);
+  p.add(g);
+}
+// そり立つ壁の湾曲面（四分円、上で垂直）と側面のシート、赤い天端
+function arc(p,d0,H,base=0,hw=1.5){
+  const R=H,N=40,pos=[],uv=[],idx=[];
+  for(let i=0;i<=N;i++){const ph=i/N*Math.PI/2,d=d0+R*Math.sin(ph),y=base+R*(1-Math.cos(ph));for(const x of[-hw,hw]){pos.push(x,y,-d);uv.push(x>0?1:0,i/N);}}
+  for(let i=0;i<N;i++){const a=i*2;idx.push(a,a+2,a+1,a+1,a+2,a+3);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();
+  p.add(new THREE.Mesh(g,M.wall));
+  const pts=[[0,0]];for(let i=1;i<=N;i++){const ph=i/N*Math.PI/2;pts.push([R*Math.sin(ph),R*(1-Math.cos(ph))]);}pts.push([R,0]);
+  for(const sx of[-1,1]){const m=sideBoard(p,pts.map(([d,y])=>[d0+d,base+y]),0,.05,M.sheet);m.position.x=sx>0?hw:-hw-.05;}
+  rbox(p,3.14,.13,.24,.05,M.vRed,0,base+H+.05,d0+R-.08);
+}
+// 壁の上の台：トラスの柱、側面のシート、手すり、赤い看板
+function tower(p,d0,d1,H,hw=1.5){
+  const L=d1-d0,c=(d0+d1)/2;
+  rbox(p,hw*2+.2,.16,L,.03,M.deck,0,H-.08,c);
+  for(const sx of[-1,1]){box(p,.03,H-.16,L,M.sheet,sx*(hw+.02),(H-.16)/2,c);for(const d of[d0+.2,d1-.2])truss(p,[sx*(hw-.2),0,d],[sx*(hw-.2),H-.16,d],.3);}
+  box(p,hw*2+.04,H-.16,.03,M.sheet,0,(H-.16)/2,d1);
+  for(const sx of[-1,1]){tube(p,[sx*(hw+.05),H,d0+.3],[sx*(hw+.05),H+1,d0+.3],.025,M.paint);tube(p,[sx*(hw+.05),H,d1],[sx*(hw+.05),H+1,d1],.025,M.paint);tube(p,[sx*(hw+.05),H+1,d0+.3],[sx*(hw+.05),H+1,d1],.025,M.paint);tube(p,[sx*(hw+.05),H+.5,d0+.3],[sx*(hw+.05),H+.5,d1],.018,M.paint);}
+  tube(p,[-(hw+.05),H+1,d1],[hw+.05,H+1,d1],.025,M.paint);
+  for(const sx of[-1,1]){tube(p,[sx*.95,H,d1-.1],[sx*.95,H+1.5,d1-.1],.03,M.steel);rbox(p,.72,.56,.05,.02,M.vRed,sx*.95,H+1.55,d1-.14);}
+}
+let anims=[];
+
+// ---------- 各障害物のモデル（足元＝床 y=0、奥へ向かって -z） ----------
+const BUILD={
+  quad(g){
+    pool(g,-.3,7.7);
+    deck(g,-2.3,-.3,1.0,2.6,M.vRed);
+    const tilt=28*Math.PI/180;
+    [[.6,-.95],[2.6,.95],[4.6,-.95],[6.6,.95]].forEach(([d,x])=>{
+      const sg=x<0?-1:1,s=new THREE.Group();s.position.set(x,1.0,-d);s.rotation.z=sg*tilt;
+      rbox(s,.9,.2,1.25,.07,M.vBlue,0,0,0);
+      box(s,.82,.012,1.17,M.cloth,0,.105,0);      // 足場を覆う黒い布
+      box(s,.5,.08,.9,M.steel,0,-.14,0);
+      flatten(g,s);
+      for(const dd of[-.38,.38]){box(g,.36,.08,.36,M.conc,x+sg*.12,.19,d+dd);tube(g,[x+sg*.12,.2,d+dd],[x,.82,d+dd],.045,M.steel,GCYL12);}
+      tube(g,[x+sg*.12,.45,d-.38],[x+sg*.06,.62,d+.38],.022,M.steel);
+    });
+    dim(g,[-1.4,1.48,-.6],[-.5,1.48,-.6],'90cm','足場の幅',.7);
+    dim(g,[2.1,.2,0],[2.1,.2,-7.25],'約7.4m＊','4枚の並び');
+    label(g,'約28°＊',new THREE.Vector3(.95,1.75,-2.6),'内向きの傾き',.7);
+    person(g,-2.9,.6);
+  },
+  hill(g){
+    pool(g,-.5,8.9);
+    const up=[],dn=[];
+    for(let i=0;i<5;i++){const t=(i+.5)/5;up.push([lerp(0,3,t),lerp(.55,2.2,t)-.25]);dn.push([lerp(3.6,6.6,t),lerp(2.2,.9,t)-.25]);}
+    for(const [arr,sg] of[[up,1],[dn,-1]])for(const [d,y] of arr){
+      const r=D(new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,2.4,32),M.roller));r.rotation.z=Math.PI/2;r.position.set(0,y,-d);g.add(r);
+      anims.push(dt=>r.rotation.x+=sg*dt*4);
+      tube(g,[-1.36,y,d],[1.36,y,d],.05,M.steel,GCYL12);
+    }
+    // 側板（白）：ローラーの並びに沿った輪郭
+    const prof=[[-.35,.15],...up.map(([d,y])=>[d,y+.34]),[3.0,2.48],[3.6,2.48],...dn.map(([d,y])=>[d,y+.34]),[6.95,.15]];
+    for(const sx of[-1,1])sideBoard(g,prof,0,.06,M.paint).position.x=sx>0?1.24:-1.3;
+    rbox(g,2.48,.26,.66,.06,M.vRed,0,2.17,3.3);
+    // 登りの下の黒いマット
+    const a=V(0,.32,-.15),b=V(0,1.92,3.0);const mt=new THREE.Mesh(GBOX,M.rubber);mt.scale.set(2.3,.05,a.distanceTo(b));mt.position.copy(a).add(b).multiplyScalar(.5);mt.lookAt(b);g.add(mt);
+    for(const d of[.4,2.0,3.3,4.6,6.2])for(const sx of[-1,1]){const hy=d<3.3?lerp(.55,2.2,d/3)+.05:d<3.7?2.3:lerp(2.2,.9,(d-3.6)/3)+.05;box(g,.3,.1,.3,M.conc,sx*1.12,.2,d);tube(g,[sx*1.12,.2,d],[sx*1.12,Math.min(2.3,hy),d],.05,M.steel,GCYL12);}
+    deck(g,6.95,8.9,.72,2.8,M.vBlue);
+    dim(g,[1.8,0,-3.3],[1.8,2.3,-3.3],'約2.3m＊','頂上の高さ');
+    dim(g,[-1.8,.2,0],[-1.8,.2,-6.6],'約6.6m＊','全長');
+    label(g,'直径50cm',new THREE.Vector3(0,1.75,-1.2),'ローラー5本＋5本',.8);
+    person(g,-2.9,-.4);
+  },
+  wing(g){
+    pool(g,-.3,10.7);
+    deck(g,-2.5,-.3,1.4,2.6,M.vBlue);deck(g,10.7,12.7,.8,2.6,M.vBlue);
+    const H=4.1,HD=[.2,2.8,5.6,8.2,10.6];
+    frame(g,-.9,11.2,2.0,H,[...HD]);
+    // レール：スタートと中間に30cmの下り段差
+    const ry=d=>d<.7?3.45:d<5.2?3.15-(d-.7)*.02:2.76-(d-5.2)*.02;
+    for(const [a,b] of[[-.4,.7],[.7,5.2],[5.2,10.6]])beam(g,[0,ry(a+.01),a],[0,ry(b-.01),b],.1,.18,M.steel);
+    for(const d of[.7,5.2]){beam(g,[0,ry(d+.01)-.09,d],[0,ry(d-.01)+.09,d],.11,.11,M.steel);rbox(g,.7,.26,.04,.02,M.hazard,0,ry(d-.01)+.3,d-.05);}
+    for(const d of HD)tube(g,[0,H-.34,d],[0,ry(d)+.09,d],.03,M.steel,GCYL12);
+    // 左右2枚のアクリル板（角の丸い斜めの長方形）を吊るした台車
+    const b=D(new THREE.Group());g.add(b);
+    box(b,.3,.16,.55,M.dark,0,-.17,0);for(const z of[-.2,.2]){const w=cyl(b,.07,.14,M.rubber,16);w.rotation.z=Math.PI/2;w.position.set(0,-.05,z);}
+    tube(b,[0,-.25,0],[0,-.6,0],.035,M.steel,GCYL12);tube(b,[-.62,-.6,0],[.62,-.6,0],.04,M.steel,GCYL12);
+    const L=2.5,W=1.2,sk=.35,shp=roundPoly([[-L/2,-W/2],[L/2-sk,-W/2],[L/2,W/2],[-L/2+sk,W/2]],.22);
+    const wg=new THREE.ExtrudeGeometry(shp,{depth:.025,bevelEnabled:false,curveSegments:6});
+    for(const sx of[-1,1]){
+      const m=new THREE.Mesh(wg,M.acrylic);m.rotation.y=Math.PI/2;m.position.set(sx*.6+(sx>0?0:-.025),-1.25,0);b.add(m);
+      for(const z of[-.6,.6])tube(b,[sx*.62,-.6,0],[sx*.62,-.66,z],.025,M.steel);
+    }
+    const dc0=1.0;
+    anims.push((dt,t)=>{const k=(t*.13)%1,d=lerp(dc0,9.3,smooth((k-.18)/.75));b.position.set(0,ry(d),-d);});
+    b.position.set(0,ry(dc0),-dc0);
+    dim(g,[2.45,.2,0],[2.45,.2,-10.3],'約10.3m＊','レール全長');
+    dim(g,[1.0,1.3,.25],[1.0,1.3,-2.25],'約2.5m＊','アクリル板の長さ',.75);
+    label(g,'段差30cm',new THREE.Vector3(0,ry(.6)+.6,-.7),'1か所目',.7);label(g,'段差30cm',new THREE.Vector3(0,ry(5.1)+.6,-5.2),'2か所目',.7);
+    person(g,-2.9,0);
+  },
+  silk(g){
+    pool(g,-.2,11.95);
+    for(const [x,m,h] of[[-.9,M.vBlue,1.2],[0,M.vRed,1.32],[.9,M.vBlue,1.2]])rbox(g,.88,h,1.9,.06,m,x,h/2,-1.15);
+    const H=6.0;frame(g,-.7,12.9,1.9,H,[4.1,8.3]);
+    truss(g,[0,H-.17,-.7],[0,H-.17,12.9]);
+    beam(g,[0,5.55,-.5],[0,5.55,12.7],.12,.16,M.steel);
+    for(const d of[-.5,4.1,8.3,12.7])tube(g,[0,5.63,d],[0,H-.34,d],.03,M.steel);
+    tube(g,[0,H-.34,10.6],[0,5.63,12.2],.04,M.alu);
+    // 台車と、つかむ赤い布
+    const tr=D(new THREE.Group());g.add(tr);
+    box(tr,.4,.2,.5,M.dark,0,5.36,0);for(const z of[-.18,.18]){const w=cyl(tr,.06,.18,M.rubber,14);w.rotation.z=Math.PI/2;w.position.set(0,5.47,z);}
+    box(tr,.36,.06,.06,M.steel,0,5.23,0);
+    const cg=new THREE.PlaneGeometry(.32,2.6,1,16);cg.translate(0,-1.3,0);const base=cg.attributes.position.array.slice();
+    const cl=D(new THREE.Mesh(cg,M.clothRed));cl.position.set(0,5.2,0);tr.add(cl);
+    anims.push((dt,t)=>{const k=(t*.12)%1,d=12.2*smooth((k-.15)/.7);tr.position.z=-d;
+      const P=cg.attributes.position;for(let i=0;i<P.count;i++){const y=base[i*3+1],f=-y/2.6;P.setZ(i,base[i*3+2]+Math.sin(t*2.2+y*2.4)*.06*f+(f*f)*.25*Math.sin(t*.9));P.setX(i,base[i*3]*(1-.25*f*Math.abs(Math.sin(t*1.3+y))));}
+      P.needsUpdate=true;cg.computeVertexNormals();});
+    // 湾曲した赤い着地台
+    const lip=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,3,40),M.vRed);lip.rotation.z=Math.PI/2;lip.scale.set(.64,1,.6);lip.position.set(0,.58,-11.2);g.add(lip);
+    deck(g,11.95,14,.6,2.6,M.vBlue);
+    dim(g,[2.3,5.8,0],[2.3,5.8,-12.2],'12.2m','滑空距離');
+    dim(g,[-2.45,0,-6.1],[-2.45,5.4,-6.1],'約5.4m＊','レールの高さ');
+    person(g,-2.9,-1);
+  },
+  fish36(g){fish(g,4,0);},
+  fish40(g){fish(g,6,9);},
+  dragon(g){
+    pool(g,-.1,15.3,2.4);
+    deck(g,-2.4,-.1,.62,2.6,M.vBlue);
+    // トランポリン
+    rbox(g,1.9,.18,1.2,.08,M.vRed,0,.5,.55);box(g,1.45,.02,.78,M.rubber,0,.6,.55);
+    for(const sx of[-1,1])for(const dd of[.15,.95])tube(g,[sx*.8,.15,dd],[sx*.8,.42,dd],.035,M.steel,GCYL12);
+    const H=5.0,CR=[1.9,4.4,7.9,9.4,12.4,15.4];
+    frame(g,-.4,16.0,2.15,H,[...CR]);
+    const rails=[[1.9,7.9,3.3,2.6],[9.4,15.4,2.9,2.15]],bars=[];
+    for(const [d0,d1,y0,y1] of rails){
+      for(const sx of[-1,1]){
+        tube(g,[sx*.85,y0+.25,d0-.2],[sx*.85,y1+.25,d1],.04,M.steel,GCYL12);
+        tube(g,[sx*.93,y0+.25,d0-.2],[sx*.93,y1+.25,d1],.012,M.ledB);
+        for(const d of[d0,(d0+d1)/2,d1]){const y=lerp(y0,y1,(d-d0)/(d1-d0))+.29;tube(g,[sx*.85,y,d],[sx*.85,H-.34,d],.018,M.steel);}
+        box(g,.12,.16,.1,M.vRed,sx*.85,y1+.25,d1+.05);
+      }
+      for(const d of[d0,(d0+d1)/2,d1])tube(g,[-2.15,H-.36,d],[2.15,H-.36,d],.03,M.steel);
+      const bar=D(new THREE.Group());g.add(bar);bars.push({bar,d0,d1,y0,y1});
+      const c=cyl(bar,.035,1.9,M.steel,14);c.rotation.z=Math.PI/2;const gp=cyl(bar,.042,.95,M.rubber,14);gp.rotation.z=Math.PI/2;
+      for(const sx of[-1,1]){tube(bar,[sx*.85,0,0],[sx*.85,.25,0],.03,M.dark,GCYL12);const w=cyl(bar,.055,.06,M.dark,14);w.rotation.z=Math.PI/2;w.position.set(sx*.85,.29,0);}
+      bar.position.set(0,y0,-d0);
+    }
+    anims.push((dt,t)=>{const k=(t%9);bars.forEach((o,i)=>{const s=smooth((k-1.2-i*3.1)/1.9);const d=lerp(o.d0,o.d1-.4,s);o.bar.position.set(0,lerp(o.y0,o.y1,(d-o.d0)/(o.d1-o.d0)),-d);});});
+    deck(g,15.4,18,.9,2.6,M.vRed);
+    dim(g,[1.6,0,-1.9],[1.6,3.3,-1.9],'約3.3m＊','1本目のバー');
+    dim(g,[-1.6,3.75,-1.9],[-1.6,3.75,-7.9],'約6m＊','1本目のレール');
+    dim(g,[-1.6,3.35,-9.4],[-1.6,3.35,-15.4],'約6m＊','2本目のレール');
+    label(g,'約1.5m＊',new THREE.Vector3(0,3.45,-8.65),'飛び移る間',.7);
+    person(g,-2.95,-1.2);
+  },
+  tackle(g){
+    const Y=.3;gdeck(g,-1.2,14.4,Y,3.2);
+    for(const sx of[-1,1]){beam(g,[sx*.9,Y+.03,-.9],[sx*.9,Y+.03,13.7],.1,.06,M.steel);box(g,.08,.006,15.2,M.hazard,sx*1.52,Y+.003,6.6);}
+    box(g,2.9,.006,.3,M.hazard,0,Y+.004,12);
+    const kg=[240,300,320];
+    for(let i=0;i<3;i++){
+      const dc=1.75+i*3,w=D(new THREE.Mesh(new THREE.BoxGeometry(2.3,1.9,.5),[M.tackleSide,M.tackleSide,M.tackleSide,M.tackleSide,M.tackleFace,M.tackleSide]));
+      w.position.set(0,Y+.1+.95,-dc);g.add(w);
+      for(const sx of[-1,1]){for(const dd of[-.17,.17]){const wh=cyl(g,.07,.07,M.dark,16);wh.rotation.z=Math.PI/2;wh.position.set(sx*.9,Y+.1,-(dc+dd));}
+        tube(g,[sx*1.0,Y+.12,dc+.27],[sx*1.0,Y+1.95,dc+.27],.03,M.steel,GCYL12);}
+      tube(g,[-1.0,Y+.12,dc+.27],[1.0,Y+1.95,dc+.27],.025,M.steel);tube(g,[1.0,Y+.12,dc+.27],[-1.0,Y+1.95,dc+.27],.025,M.steel);
+      if(i===0)for(const sx of[-1,1]){const c=new THREE.Mesh(new THREE.CapsuleGeometry(.1,1.1,4,14),M.vRed);c.position.set(sx*.62,Y+1.05,-(dc-.36));g.add(c);}
+      label(g,kg[i]+'kg',new THREE.Vector3(0,Y+2.32,-(1.5+i*3)),null,.6);
+    }
+    box(g,3.2,1.3,.8,M.tackleSide,0,Y+.65,14.0);box(g,3.2,.16,.82,M.hazard,0,Y+1.3,14.0);
+    dim(g,[1.9,Y+.05,-1.5],[1.9,Y+.05,-13.5],'12m','押して進む距離');
+    dim(g,[-1.7,Y+.1,-1.5],[-1.7,Y+2.0,-1.5],'約1.9m＊','壁の高さ',.7);
+    dim(g,[-1.15,Y+2.72,-1.5],[1.15,Y+2.72,-1.5],'約2.3m＊','壁の幅',.7);
+    label(g,'計860kg',new THREE.Vector3(0,Y+3.35,-4.5),'3枚の合計',.8);
+    person(g,-2.3,0);
+  },
+  wall(g){
+    rbox(g,3,.05,3.2,.02,M.rubber,0,.025,1.6);
+    arc(g,0,4.5);tower(g,4.5,7,4.5);
+    dim(g,[2,0,-4.5],[2,4.5,-4.5],'4.5m','そり立つ壁の高さ',1);
+    person(g,-.4,-.6);
+  },
+  wall2(g){
+    rbox(g,3,.05,3.2,.02,M.rubber,0,.025,1.6);
+    arc(g,0,4.2);tower(g,4.2,6.2,4.2);
+    rbox(g,3,2.8,1.2,.08,M.vBlue,0,1.4,6.8);rbox(g,3,1.4,1.2,.08,M.vBlue,0,.7,8);
+    rbox(g,3,.05,6.4,.02,M.rubber,0,.025,11.8);
+    arc(g,15,4.5);tower(g,19.5,22,4.5);
+    dim(g,[2,0,-4.2],[2,4.2,-4.2],'4.2m','1つ目',1);
+    dim(g,[2,0,-19.5],[2,4.5,-19.5],'4.5m','2つ目',1);
+    label(g,'マットの段差',new THREE.Vector3(0,3.6,-7.4),'約1.4m×2段＊',.8);
+    person(g,-.4,-.6);
+  }
+};
+function fish(g,n,yellow){
+  const FY=3.0,L=2.3,ds=[];
+  deck(g,-2.2,-.2,.62,2.6,M.vBlue);
+  for(let i=0;i<n;i++){const d=1.5+i*1.5,top=.42+(i%2?.16:0);const s=cyl(g,.15,top,M.gray,24);s.position.set(0,top/2,-d);const cp=cyl(g,.152,.03,M.rubber,24);cp.position.set(0,top+.0,-d);ds.push(d);}
+  const last=ds[ds.length-1],dA=.6,dB=last+.8;
+  pool(g,-.2,last+1.0);
+  deck(g,last+1.0,last+3.2,.62,2.6,M.vBlue);
+  const H=FY+.62,d0=dA-.7,d1=dB+.7;
+  frame(g,d0,d1,2.0,H,[(d0+d1)/2]);
+  tube(g,[0,FY,d0],[0,FY,d1],.08,M.steel,GCYL12);
+  for(const d of[d0,(d0+d1)/2,d1]){tube(g,[0,FY+.08,d],[0,H-.34,d],.06,M.steel,GCYL12);box(g,.3,.24,.2,M.dark,0,FY,d);}
+  box(g,.5,.42,.6,M.dark,0,H+.21,d1);
+  const mk=(d,ph,w,offs,mat)=>{const r=D(new THREE.Group());r.position.set(0,FY,-d);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.14,20),M.steel);hub.rotation.x=Math.PI/2;r.add(hub);
+    for(const o of offs){const h=new THREE.Group();h.rotation.z=o;const c=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,L,12),mat);c.position.y=-L/2-.08;h.add(c);
+      const tip=new THREE.Mesh(new THREE.SphereGeometry(.052,12,8),M.rubber);tip.position.y=-L-.08;h.add(tip);r.add(h);}
+    g.add(r);anims.push((dt,t)=>r.rotation.z=ph+w*t);};
+  for(let i=0;i<11;i++)mk(lerp(dA+.2,dB-.2,i/10),i*.62,.35,[0,Math.PI],M.poleR);
+  for(let i=0;i<yellow;i++)mk(lerp(dA+.45,dB-.45,i/(yellow-1)),1.4+i*.9,-.35,[0],M.poleY);
+  dim(g,[-.15,.7,-1.5],[.15,.7,-1.5],'30cm','足場の直径',.7);
+  dim(g,[-2.45,0,-(dA+dB)/2],[-2.45,FY,-(dA+dB)/2],'約3m＊','回転軸の高さ');
+  dim(g,[2.45,.2,-1.5],[2.45,.2,-last],`約${(last-1.5).toFixed(1)}m`,`足場${n}つの並び`);
+  person(g,-2.95,-1);
+}
+// 固定部分を材質ごとに1つのメッシュにまとめる（描画を軽くする）
+function bake(g){
+  const groups=new Map();
+  for(const m of[...g.children]){
+    if(!m.isMesh||m.userData.dyn||Array.isArray(m.material))continue;
+    m.updateMatrix();const geo=m.geometry.index?m.geometry.toNonIndexed():m.geometry.clone();geo.applyMatrix4(m.matrix);
+    const k=m.material.uuid+(m.userData.noCast?'n':'');
+    if(!groups.has(k))groups.set(k,{mat:m.material,noCast:m.userData.noCast,list:[]});
+    groups.get(k).list.push(geo);g.remove(m);
+  }
+  for(const {mat,noCast,list} of groups.values()){
+    let n=0;for(const q of list)n+=q.attributes.position.count;
+    const P=new Float32Array(n*3),N=new Float32Array(n*3),U=new Float32Array(n*2);let o=0;
+    for(const q of list){const a=q.attributes;P.set(a.position.array,o*3);if(a.normal)N.set(a.normal.array,o*3);if(a.uv)U.set(a.uv.array,o*2);o+=a.position.count;q.dispose();}
+    const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('normal',new THREE.BufferAttribute(N,3));G.setAttribute('uv',new THREE.BufferAttribute(U,2));G.computeBoundingSphere();
+    const mm=new THREE.Mesh(G,mat);mm.userData.noCast=noCast;g.add(mm);
+  }
+}
+// 太陽と影の範囲を障害物に合わせ、カメラ映像の床に落ちる影の受け皿を置く
+function lightUp(g){
+  g.traverse(o=>{if(o.isMesh){o.castShadow=!o.material.transparent&&!o.userData.noCast&&!o.material.isMeshBasicMaterial;o.receiveShadow=true;}});
+  g.updateMatrixWorld(true);const bb=new THREE.Box3();g.traverse(o=>{if(o.isMesh)bb.expandByObject(o);});
+  const c=bb.getCenter(new THREE.Vector3()),s=bb.getSize(new THREE.Vector3()),R=Math.hypot(s.x,s.y,s.z)/2+.5;
+  sun.position.copy(c).add(SUNDIR.clone().multiplyScalar(R+10));sun.target.position.copy(c);g.add(sun);g.add(sun.target);
+  const sc=sun.shadow.camera;sc.left=sc.bottom=-R;sc.right=sc.top=R;sc.near=1;sc.far=2*R+12;sc.updateProjectionMatrix();
+  catcher=new THREE.Mesh(new THREE.PlaneGeometry(s.x+10,s.z+10),catcherMat);catcher.rotation.x=-Math.PI/2;catcher.position.set(c.x,.003,c.z);catcher.receiveShadow=true;g.add(catcher);
+}
+// ---------- 表示の切り替え ----------
+let cur=null,root=new THREE.Group(),yawTurn=0;scene.add(root);
+const rail=$('#rail'),dlist=$('#dlist');
+const SHORT={quad:'クワッド',hill:'ヒル',wing:'ウイング',silk:'シルク',fish36:'フィッシュ36',fish40:'フィッシュ40',dragon:'ドラゴン',tackle:'タックル',wall:'そり立つ壁',wall2:'2連壁'};
+ITEMS.forEach((it,i)=>{
+  const no=String(i+1).padStart(2,'0');
+  const r=document.createElement('button');r.className='rb';r.id='rb-'+it.key;r.setAttribute('aria-label',it.jp+'（'+it.used+'）');
+  r.innerHTML=`<b>${no}</b><span>${SHORT[it.key]}</span>`;r.onclick=()=>select(it.key);rail.appendChild(r);
+  const d=document.createElement('button');d.className='di';d.id='di-'+it.key;
+  d.innerHTML=`<span class="no">${no}</span><span class="nm">${it.jp}</span><span class="tg">${it.used}</span>`;
+  d.onclick=()=>{select(it.key);drawer(false);};dlist.appendChild(d);
+});
+function drawer(open){$('#drawer').classList.toggle('open',open);$('#scrim').hidden=!open;}
+$('#listBtn').onclick=()=>drawer(true);$('#closeBtn').onclick=()=>drawer(false);$('#scrim').onclick=()=>drawer(false);
+let cardMin=false;$('#card').onclick=()=>{cardMin=!cardMin;$('#card').classList.toggle('min',cardMin);};
+function select(key){
+  const it=ITEMS.find(x=>x.key===key);cur=it;
+  ITEMS.forEach(x=>{$('#rb-'+x.key).setAttribute('aria-current',x.key===key);$('#di-'+x.key).setAttribute('aria-current',x.key===key);});
+  scene.remove(root);root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.isSprite){o.material.map.dispose();o.material.dispose();}});
+  root=new THREE.Group();scene.add(root);anims=[];yawTurn=0;
+  const g=new THREE.Group();root.add(g);BUILD[key](g);bake(g);lightUp(g);
+  const st=$('#status')?$('#status').outerHTML:'<span id="status">指で見回し</span>';
+  $('#card').innerHTML=`<div class="hd"><span class="en">${it.en}</span>${st}</div><h2>${it.jp}</h2><ul>${it.spec.map(s=>`<li>${s}</li>`).join('')}</ul><div class="used">登場：${it.used}　<span class="tog">（タップで${cardMin?'開く':'たたむ'}）</span></div>`;
+  $('#dist').value=it.dist;
+  if(mode==='gyro')needCenter=true;else headingYaw=yaw;
+  place();
+  $('#rb-'+key).scrollIntoView({block:'nearest'});
+  try{localStorage.setItem('sasukeARreal.key',key);}catch(e){}
+}
+function place(){
+  const d=+$('#dist').value;$('#distO').textContent=d.toFixed(1)+'m';
+  root.rotation.y=headingYaw;root.children[0].position.set(0,0,-d);root.children[0].rotation.y=0;
+  root.children[0].rotation.y=yawTurn;
+}
+$('#dist').oninput=place;
+$('#turn').onclick=()=>{yawTurn+=Math.PI/2;place();};
+
+// ---------- 視点：ジャイロ または 指 ----------
+const EYE=1.4;
+let mode='drag',yaw=0,pitch=-.12,headingYaw=0,ori=null;
+const zee=new THREE.Vector3(0,0,1),eul=new THREE.Euler(),q0=new THREE.Quaternion(),q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));
+function gyroQuat(q,o){
+  const a=THREE.MathUtils.degToRad(o.alpha||0),b=THREE.MathUtils.degToRad(o.beta||0),c=THREE.MathUtils.degToRad(o.gamma||0);
+  const so=THREE.MathUtils.degToRad((screen.orientation&&screen.orientation.angle)||window.orientation||0);
+  eul.set(b,a,-c,'YXZ');q.setFromEuler(eul);q.multiply(q1);q.multiply(q0.setFromAxisAngle(zee,-so));return q;
+}
+function currentYaw(){return new THREE.Euler().setFromQuaternion(camera.quaternion,'YXZ').y;}
+$('#recenter').onclick=()=>{headingYaw=mode==='gyro'?currentYaw():yaw;place();toast('正面に置き直しました');};
+// 1本指：ジャイロ中は障害物を回す／それ以外は見回す。2本指：ピンチで距離
+const pts=new Map();let pinch0=null,dist0=4;
+canvas.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);
+  if(pts.size===2){const [a,b]=[...pts.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);dist0=+$('#dist').value;}});
+canvas.addEventListener('pointermove',e=>{
+  const p=pts.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+  if(pts.size===2&&pinch0){const [a,b]=[...pts.values()];const r=pinch0/Math.max(20,Math.hypot(a.x-b.x,a.y-b.y));$('#dist').value=Math.max(1,Math.min(20,dist0*r)).toFixed(1);place();return;}
+  if(pts.size!==1)return;
+  if(mode==='gyro'){yawTurn+=dx*.008;place();}
+  else{yaw+=dx*.005;pitch=Math.max(-1.4,Math.min(1.4,pitch+dy*.005));}
+});
+const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch0=null;};canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+canvas.addEventListener('wheel',e=>{e.preventDefault();$('#dist').value=Math.max(1,Math.min(20,+$('#dist').value*(e.deltaY>0?1.08:.93))).toFixed(1);place();},{passive:false});
+
+const USE_CAMERA=false;
+const video=$('#cam');let stream=null,wake=null,wantGyro=false,needCenter=false,gyroTimer=null;
+// 端末によっては最初のイベントが遅れたり、ボタンを押す前にしか来ないので、開いた時点から受け取り続ける
+let relSeen=false;
+function onOri(e,abs){
+  if(e.alpha==null&&e.beta==null&&e.gamma==null)return;
+  if(abs&&relSeen)return;            // 相対値が来る端末では相対値だけを使う（混ぜると揺れる）
+  if(!abs)relSeen=true;
+  ori={alpha:e.alpha||0,beta:e.beta||0,gamma:e.gamma||0};
+  if(wantGyro&&mode!=='gyro')enterGyro();
+}
+addEventListener('deviceorientation',e=>onOri(e,false));
+addEventListener('deviceorientationabsolute',e=>onOri(e,true));
+function enterGyro(){
+  mode='gyro';needCenter=true;clearTimeout(gyroTimer);setStatus(true,!!stream);
+}
+async function startAR(){
+  // iPhone は「押した直後」に許可を求める必要があるので、await より前に両方の要求を出す
+  let perm=null,camP=null;
+  try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function')perm=DeviceOrientationEvent.requestPermission();}catch(e){perm=null;}
+  if(USE_CAMERA)try{if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)camP=navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});}catch(e){camP=null;}
+    // ジャイロ：許可の返事ではなく「値が実際に届いたか」で判断する
+  // （新しい Android 版 Chrome は requestPermission を持ち、denied を返しても値が届くことがある）
+  let permState='none';
+  if(perm){try{permState=await perm;}catch(e){permState='error';}}
+  if(typeof DeviceOrientationEvent!=='undefined'){
+    wantGyro=true;
+    if(ori)enterGyro();
+    else gyroTimer=setTimeout(()=>{if(mode==='gyro')return;
+      toast(permState==='denied'||permState==='error'
+        ?'「動きと方向」が許可されていません。<br>iPhone：設定 › Safari ›「モーションと画面の向きのアクセス」をオン<br>Android：サイトの設定 ›「モーション センサー」を許可'
+        :'傾きセンサーの値が届きません。<br>スマホを少し動かしてください（指でも見回せます）');},3000);
+  }else toast('この端末では傾きセンサーを使えません。<br>指で見回せます');
+  // カメラ
+  let camOK=false;
+  if(!USE_CAMERA){}
+  else if(camP){
+    try{stream=await camP;video.srcObject=stream;video.hidden=false;try{await video.play();}catch(e){}camOK=true;}
+    catch(e){toast(e&&e.name==='NotAllowedError'?'カメラが許可されませんでした。<br>ブラウザの設定でカメラを許可してください':'カメラを開けませんでした。<br>HTTPSのページで開いているか確認してください');}
+  }else toast('このブラウザではカメラを使えません。<br>HTTPSのページで開いてください');
+  if(camOK)env.visible=false;
+  try{if(navigator.wakeLock)wake=await navigator.wakeLock.request('screen');}catch(e){}
+  setStatus(mode==='gyro',camOK);
+  if((camOK||!USE_CAMERA)&&(mode==='gyro'||wantGyro))toast('見たい方向で障害物を選ぶと正面に置かれます<br>1本指で回転、2本指のピンチで距離');
+}
+function stopAR(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  try{wake&&wake.release();}catch(e){}wake=null;
+  wantGyro=false;clearTimeout(gyroTimer);video.hidden=true;env.visible=true;mode='drag';yaw=headingYaw;pitch=-.12;
+  setStatus(false,false);
+}
+function setStatus(g,c){const st=$('#status');if(!st)return;st.className=g||c?'on':'';st.textContent=g&&c?'AR：カメラ＋ジャイロ':g?(USE_CAMERA?'ジャイロのみ（カメラなし）':'仮想背景＋ジャイロ'):c?'カメラのみ（指で見回し）':'指で見回し';}
+$('#startNo').onclick=()=>{const st=$('#start');st.hidden=true;st.style.display='none';toast('指で見回し、ピンチで距離を変えられます');};
+$('#startAR').onclick=()=>{const st=$('#start');st.hidden=true;st.style.display='none';startAR();};
+let tt;function toast(m){const h=$('#hint');h.innerHTML=m;h.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>h.style.opacity=0,3800);}
+document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&stream&&navigator.wakeLock){try{wake=await navigator.wakeLock.request('screen');}catch(e){}}});
+
+// ---------- ループ ----------
+function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;
+  // スマホ背面カメラの画角の目安：横向きの水平約65°
+  const hfov=THREE.MathUtils.degToRad(camera.aspect<1?50:65);camera.fov=THREE.MathUtils.radToDeg(2*Math.atan(Math.tan(hfov/2)/camera.aspect));camera.updateProjectionMatrix();}
+addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,300));
+const clock=new THREE.Clock();let T=0;
+function loop(){
+  requestAnimationFrame(loop);const dt=Math.min(.05,clock.getDelta());T+=dt;
+  for(const f of anims)f(dt,T);
+  TX.waterN.offset.set(T*.018,T*.011);if(catcher)catcher.visible=!env.visible;
+  camera.position.set(0,EYE,0);
+  if(mode==='gyro'&&ori){gyroQuat(camera.quaternion,ori);if(needCenter){needCenter=false;headingYaw=currentYaw();place();}}else camera.rotation.set(pitch,yaw,0);
+  renderer.render(scene,camera);
+}
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>{
+  resize();let k='quad';try{k=localStorage.getItem('sasukeARreal.key')||k;}catch(e){}
+  if(!ITEMS.find(x=>x.key===k))k='quad';select(k);loop();
+});
+})();
+</script>
+</body>
+</html>

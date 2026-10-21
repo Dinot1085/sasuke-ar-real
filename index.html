@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SASUKE 実寸AR リアル版</title>
+<meta name="theme-color" content="#04070e">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Share+Tech+Mono&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: スマホ縦持ち基準。タイトルの下に2つの版を縦に並べ、広い画面では横に並べる */
+:root{
+  --bg:#04070e; --panel:rgba(10,18,40,.9); --line:rgba(150,175,230,.24);
+  --ink:#eef3ff; --muted:#9aa9c9; --accent:#ffcf2e;
+  --f-disp:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-num:"Share Tech Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 50% 0%,rgba(44,99,255,.3),transparent 60%),var(--bg);color:var(--ink);font-family:var(--f-body)}
+.wrap{max-width:860px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 32px) 20px calc(env(safe-area-inset-bottom,0px) + 32px);display:flex;flex-direction:column;gap:20px}
+small.k{font:400 12px/1.4 var(--f-num);letter-spacing:.3em;color:var(--accent)}
+h1{margin:0;font:400 clamp(32px,9vw,52px)/1.08 var(--f-disp);text-wrap:balance}
+p.lead{margin:0;color:var(--muted);line-height:1.75;font-size:15px;max-width:36em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+a.card{display:flex;flex-direction:column;gap:10px;text-decoration:none;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+a.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a.card .tag{font:400 11px/1 var(--f-num);letter-spacing:.2em;color:var(--accent)}
+a.card b{font:400 24px/1.15 var(--f-disp)}
+a.card ul{margin:0;padding-left:1.2em;font-size:14px;line-height:1.7}
+a.card .go{margin-top:auto;min-height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;background:var(--accent);color:#141000}
+a.card.sub .go{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.list{font-size:13px;color:var(--muted);line-height:1.8}
+.list b{color:var(--ink)}
+.note{font-size:12px;color:var(--muted);line-height:1.7;margin:0}
+.note a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <small class="k">REALISTIC · LIFE-SIZE · AR</small>
+  <h1>SASUKE 1st<br>実寸AR リアル版</h1>
+  <p class="lead">第36回・第40回の1stステージの障害物を、1つずつ実物大で目の前に置いて大きさを確かめられます。この版は、白いトラスの骨組み・水を張ったプール・床に落ちる影など、3Dモデルを実物に近づけたものです。見え方の違う2つの版から選んでください。</p>
+  <div class="grid">
+    <a class="card" href="./camera.html">
+      <span class="tag">CAMERA</span>
+      <b>カメラ版</b>
+      <ul>
+        <li>カメラに映る景色の中に障害物を置く</li>
+        <li>選んだ瞬間、スマホが向いている方向の正面に固定</li>
+        <li>カメラと「動きと方向」の許可が必要</li>
+      </ul>
+      <span class="go">カメラ版をひらく</span>
+    </a>
+    <a class="card sub" href="./virtual.html">
+      <span class="tag">VIRTUAL</span>
+      <b>仮想背景版</b>
+      <ul>
+        <li>目盛り付きの地面の上に障害物を置く</li>
+        <li>スマホを傾けて見回せる（指でも可）</li>
+        <li>カメラを使わないので室内や夜でも見やすい</li>
+      </ul>
+      <span class="go">仮想背景版をひらく</span>
+    </a>
+  </div>
+  <div class="list"><b>見られる障害物</b>：クワッドステップス／ローリングヒル／ウイングスライダー／シルクスライダー／フィッシュボーン（第36回・第40回）／ドラゴングライダー／タックル／そり立つ壁／2連そり立つ壁</div>
+  <p class="note">スマホのSafari・Chromeで開いてください。寸法は Wikipedia「<a href="https://ja.wikipedia.org/wiki/SASUKE" target="_blank" rel="noopener">SASUKE</a>」の各エリア解説によります。＊は記載がなく推定した値です。非公式のファン再現です。以前のシンプルな版は<a href="https://dinot1085.github.io/sasuke-ar2/">こちら</a>。</p>
+</div>
+</body>
+</html>
